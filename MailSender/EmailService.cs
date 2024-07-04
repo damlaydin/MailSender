@@ -31,6 +31,7 @@ namespace MailSender
 
             message.Subject = subject;
 
+            // a BodyBuilder to construct the email body
             var bodyBuilder = new BodyBuilder
             {
                 HtmlBody = body
@@ -40,13 +41,15 @@ namespace MailSender
             {
                 foreach (var imagePath in imagePaths)
                 {
+                    // Create a linked resource for each image
                     var linkedResource = new MimePart("image", "jpeg")
                     {
+                        // Read the image file
                         Content = new MimeContent(File.OpenRead(imagePath)),
-                        ContentId = MimeUtils.GenerateMessageId(),
+                        ContentId = MimeUtils.GenerateMessageId(), //Generate Id
                         ContentDisposition = new ContentDisposition(ContentDisposition.Inline),
                         ContentTransferEncoding = ContentEncoding.Base64,
-                        FileName = Path.GetFileName(imagePath)
+                        FileName = Path.GetFileName(imagePath) // Set the file name
                     };
 
                     bodyBuilder.LinkedResources.Add(linkedResource);
@@ -60,6 +63,7 @@ namespace MailSender
                 {
                     if (attachment.Length > 0)
                     {
+                        // Copy the attachment to a memory stream
                         using (var stream = new MemoryStream())
                         {
                             await attachment.CopyToAsync(stream);
@@ -71,11 +75,13 @@ namespace MailSender
 
             message.Body = bodyBuilder.ToMessageBody();
 
+
+            // Create an SmtpClient to send the email
             using (var client = new SmtpClient())
             {
                 await client.ConnectAsync(_configuration["EmailSettings:SmtpServer"], int.Parse(_configuration["EmailSettings:SmtpPort"]), SecureSocketOptions.StartTls);
                 await client.AuthenticateAsync(_configuration["EmailSettings:SmtpUser"], _configuration["EmailSettings:SmtpPass"]);
-                await client.SendAsync(message);
+                await client.SendAsync(message);  // Send the email
                 await client.DisconnectAsync(true);
             }
         }

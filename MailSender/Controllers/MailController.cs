@@ -44,9 +44,11 @@ namespace MailSender.Controllers
         [HttpPost]
         private async Task SendEmail(User user, string subject, string bodyTemplate, List<IFormFile> attachments, string templateName)
         {
+            // Get the current HTTP request
             var request = HttpContext.Request;
             var baseUrl = $"{request.Scheme}://{request.Host}{request.PathBase}";
 
+            // Replace body template with userd actual data
             var emailBody = bodyTemplate
                 .Replace("{{FirstName}}", user.FirstName)
                 .Replace("{{LastName}}", user.LastName);
@@ -73,6 +75,7 @@ namespace MailSender.Controllers
                 emailBody += "<br/><br/>Attachments:<br/>";
                 foreach (var attachment in attachments)
                 {
+                    // Construct the file path and URL for each attachment
                     var filePath = Path.Combine("wwwroot/uploads", attachment.FileName);
                     var fileUrl = $"{baseUrl}/uploads/{attachment.FileName}";
 
@@ -116,11 +119,13 @@ namespace MailSender.Controllers
                 }
             }
 
+            // Add to database and save changes
             _context.SentEmails.Add(sentEmail);
             await _context.SaveChangesAsync();
         }
 
 
+        // to display a list of sent emails
         public async Task<IActionResult> SentMails()
         {
             var sentMails = await _context.SentEmails.Include(e => e.Attachments).ToListAsync();
@@ -144,12 +149,14 @@ namespace MailSender.Controllers
 
         public async Task<IActionResult> GetEmail(int id)
         {
+           // get the email with the specified ID
             var email = await _context.SentEmails.Include(e => e.Attachments).FirstOrDefaultAsync(e => e.Id == id);
             if (email == null)
             {
                 return NotFound();
             }
 
+            // Return the email detail with JSON 
             return Json(new { id = email.Id, subject = email.Subject, body = email.Body });
         }
 
@@ -162,11 +169,13 @@ namespace MailSender.Controllers
         [HttpPost]
         public async Task<IActionResult> UploadFile(IFormFile file)
         {
+            // Check if the uploaded file is valid
             if (file == null || file.Length == 0)
                 return BadRequest("File is empty");
 
             var uploads = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/uploads");
 
+            // Create the uploads directory
             if (!Directory.Exists(uploads))
             {
                 Directory.CreateDirectory(uploads);
@@ -174,6 +183,7 @@ namespace MailSender.Controllers
 
             var filePath = Path.Combine(uploads, file.FileName);
 
+            // Save the uploaded file to  server
             using (var fileStream = new FileStream(filePath, FileMode.Create))
             {
                 await file.CopyToAsync(fileStream);
@@ -190,12 +200,16 @@ namespace MailSender.Controllers
 
         public IActionResult TemplateSend()
         {
+            // Get the list of groups from the database
+            // create SelectListItems for the dropdown
             var groups = _context.Groups.Select(g => new SelectListItem
             {
                 Value = g.GroupName,
                 Text = g.GroupName
             }).ToList();
 
+
+            //List of email templates
             var templates = new List<SelectListItem>
             {
                 new SelectListItem { Value = "TemplateEmailGroupA.html", Text = "Group A Template" },
@@ -216,8 +230,13 @@ namespace MailSender.Controllers
         {
             _logger.LogInformation("SendTemplateEmail POST action started.");
 
+            // the subject of the email
             string subject = $"Email for {model.GroupName}";
+
+            // Define the path to the email template
             string templatePath = Path.Combine(Directory.GetCurrentDirectory(), "EmailTemplates", model.TemplateName);
+
+            //Read the email 
             string bodyTemplate = await System.IO.File.ReadAllTextAsync(templatePath);
 
             var baseUrl = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}{HttpContext.Request.PathBase}";
@@ -234,6 +253,7 @@ namespace MailSender.Controllers
             foreach (var member in group.GroupMembers)
             {
                 string body = bodyTemplate.Replace("{{FirstName}}", member.User.FirstName).Replace("{{LastName}}", member.User.LastName);
+                // Send the email
                 await SendEmail(member.User, subject, body, null, model.TemplateName);
             }
 
