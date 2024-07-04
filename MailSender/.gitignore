@@ -1,0 +1,15 @@
+# Ignore appsettings files
+/appsettings.json
+/appsettings.*.json
+
+# Ignore Visual Studio files
+/.vscode/
+/.vs/
+
+# Ignore NuGet packages
+/packages/
+/*.nupkg
+
+# Ignore build output
+/bin/
+/obj/

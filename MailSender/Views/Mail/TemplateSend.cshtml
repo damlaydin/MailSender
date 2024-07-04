@@ -1,0 +1,46 @@
+﻿@model MailSender.Models.TemplateSendViewModel
+
+@{
+    ViewData["Title"] = "Send Template Email";
+}
+
+<h2>Send Template Email</h2>
+<!-- Drop down type -->
+<form asp-action="SendTemplateEmail" method="post">
+    <div class="form-group">
+        <label for="GroupName">Select Group</label>
+        <select asp-for="GroupName" class="form-control" asp-items="Model.Groups">
+            <option value="">-- Select a Group --</option>
+        </select>
+        <span asp-validation-for="GroupName" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label for="TemplateName">Select Template</label>
+        <select asp-for="TemplateName" class="form-control" asp-items="Model.Templates">
+            <option value="">-- Select a Template --</option>
+        </select>
+        <span asp-validation-for="TemplateName" class="text-danger"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">Send Mail</button>
+</form>
+<br>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
+
+
+
+<!-- Button  type
+<form asp-action="SendTemplateEmailAll" method="post">
+    <button type="submit" class="btn btn-primary">Send to All Users</button>
+</form>
+<br>
+<form asp-action="SendTemplateEmailGroupA" method="post">
+    <button type="submit" class="btn btn-primary">Send to Group A</button>
+</form>
+<br>
+<form asp-action="SendTemplateEmailGroupB" method="post">
+    <button type="submit" class="btn btn-primary">Send to Group B</button>
+</form>
+-->

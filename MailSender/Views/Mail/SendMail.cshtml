@@ -1,0 +1,116 @@
+﻿@model MailSender.Models.SendMailViewModel
+
+@{
+    ViewData["Title"] = "Send Mail";
+}
+
+<h1 class="text-center">Send Mail</h1>
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <form asp-action="SendMail" asp-controller="Mail" method="post" enctype="multipart/form-data">
+            <div class="form-group">
+                <label asp-for="SenderEmail" class="control-label"></label>
+                <input asp-for="SenderEmail" class="form-control" />
+                <span asp-validation-for="SenderEmail" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label for="Subject">Subject</label>
+                <input type="text" id="Subject" name="Subject" class="form-control" value="@Model.Subject" />
+                <span asp-validation-for="Subject" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SelectedGroupId" class="control-label">Select a Group</label>
+                <select asp-for="SelectedGroupId" class="form-control" asp-items="Model.Groups">
+                    <option value="">-- Select a Group --</option>
+                </select>
+                <span asp-validation-for="SelectedGroupId" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label for="Attachments">Attachments</label>
+                <input type="file" id="Attachments" name="attachments" class="form-control" multiple />
+            </div>
+            <div class="form-group">
+                <label for="Body">Body</label>
+                <textarea id="Body" name="Body" class="form-control" rows="15"></textarea>
+                <span asp-validation-for="Body" class="text-danger"></span>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Send Email</button>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+    <script>
+        tinymce.init({
+            selector: 'textarea',
+            height: 400, 
+            plugins: 'image media link code lists advlist media',
+            toolbar: 'undo redo | blocks | bold italic | alignleft aligncenter alignright alignjustify | indent outdent | image | media | insertfile',
+
+            // For file upload with TinyMCE
+            images_upload_url: '@Url.Action("UploadFile", "Mail")',
+            automatic_uploads: true,
+            file_picker_types: 'file image media',
+            file_picker_callback: function (callback, value, meta) {
+                var input = document.createElement('input');
+                input.setAttribute('type', 'file');
+                input.setAttribute('accept', meta.filetype === 'image' ? 'image/*' : (meta.filetype === 'media' ? 'video/*' : '*/*'));
+
+                input.onchange = function () {
+                    var file = this.files[0];
+                    var reader = new FileReader();
+
+                    reader.onload = function () {
+                        var formData = new FormData();
+                        formData.append('file', file);
+
+                        fetch('@Url.Action("UploadFile", "Mail")', {
+                            method: 'POST',
+                            body: formData
+                        }).then(response => response.json())
+                            .then(result => {
+                                if (result.location) {
+                                    callback(result.location, { alt: file.name });
+                                }
+                            });
+                    };
+
+                    reader.readAsDataURL(file);
+                };
+
+                input.click();
+            },
+            setup: function (editor) {
+                editor.on('init', function () {
+                    editor.setContent('Hey {{FirstName}} {{LastName}}');
+                });
+            },
+
+            formats: {
+                h1: { block: "h1", styles: { fontSize: "32px" } },
+                h2: { block: "h2", styles: { fontSize: "18px" } },
+                cta: {
+                    selector: "a",
+                    styles: {
+                        backgroundColor: "#706FD3",
+                        padding: "12px 16px",
+                        color: "#ffffff",
+                        borderRadius: "4px",
+                        textDecoration: "none",
+                        display: "inline-block"
+                    }
+                }
+            },
+            style_formats: [
+                { title: "Paragraph", format: "p" },
+                { title: "Heading 1", format: "h1" },
+                { title: "Heading 2", format: "h2" },
+                { title: "Button styles" },
+                { title: "Call-to-action", format: "cta" }
+            ]
+        });
+    </script>
+}

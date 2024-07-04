@@ -1,0 +1,126 @@
+﻿@model IEnumerable<MailSender.Data.SentEmail>
+
+@{
+    ViewData["Title"] = "Sent Mails";
+}
+
+<h1>Sent Mails</h1>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+}
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Subject</th>
+            <th>Body</th>
+            <th>Sent Date</th>
+            <th>Operations</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var email in Model)
+        {
+            <tr>
+                <td>@email.Subject</td>
+                <td>@Html.Raw(email.Body)</td>
+                <td>@email.SentDate</td>
+                <td>
+                    <div class="dropdown">
+                        <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                            Actions
+                        </button>
+                        <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                            <a class="dropdown-item" href="#" data-toggle="modal" data-target="#updateModal" data-id="@email.Id">
+                                Update  <i class="fas fa-pencil-alt"></i>
+                            </a>
+                            <a class="dropdown-item" href="/Mail/Delete/@email.Id">
+                                Delete  <i class="fas fa-trash-alt"></i>
+                            </a>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<!-- Modal for Update -->
+<div class="modal fade" id="updateModal" tabindex="-1" role="dialog" aria-labelledby="updateModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="updateModalLabel">Update Email</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="updateForm" asp-action="UpdateEmail" asp-controller="Mail" method="post" enctype="multipart/form-data">
+                    <input type="hidden" id="EmailId" name="Id" />
+                    <div class="form-group">
+                        <label for="UpdateSubject">Subject</label>
+                        <input type="text" id="UpdateSubject" name="Subject" class="form-control" />
+                    </div>
+                    <div class="form-group">
+                        <label for="UpdateBody">Body</label>
+                        <textarea id="UpdateBody" name="Body" class="form-control"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="Attachments">Attachments (Optional)</label>
+                        <input type="file" id="Attachments" name="attachments" class="form-control" multiple />
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save changes</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        tinymce.init({
+            selector: '#UpdateBody',
+            menubar: false,
+            plugins: 'link image media',
+            toolbar: 'undo redo | formatselect | bold italic backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | image media | help',
+            image_title: true,
+            automatic_uploads: true,
+            file_picker_types: 'image media',
+            file_picker_callback: function (cb, value, meta) {
+                var input = document.createElement('input');
+                input.setAttribute('type', 'file');
+                input.setAttribute('accept', (meta.filetype === 'image' ? 'image/*' : 'video/*'));
+
+                input.onchange = function () {
+                    var file = this.files[0];
+                    var reader = new FileReader();
+                    reader.onload = function () {
+                        var id = 'blobid' + (new Date()).getTime();
+                        var blobCache = tinymce.activeEditor.editorUpload.blobCache;
+                        var base64 = reader.result.split(',')[1];
+                        var blobInfo = blobCache.create(id, file, base64);
+                        blobCache.add(blobInfo);
+                        cb(blobInfo.blobUri(), { title: file.name });
+                    };
+                    reader.readAsDataURL(file);
+                };
+
+                input.click();
+            }
+        });
+
+        $('#updateModal').on('show.bs.modal', function (event) {
+            var button = $(event.relatedTarget);
+            var id = button.data('id');
+
+            $.get('/Mail/GetEmail/' + id, function (data) {
+                $('#EmailId').val(data.id);
+                $('#UpdateSubject').val(data.subject);
+                tinymce.get('UpdateBody').setContent(data.body);
+            });
+        });
+    </script>
+}

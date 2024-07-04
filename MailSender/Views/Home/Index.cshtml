@@ -1,0 +1,31 @@
+﻿@model IEnumerable<MailSender.Data.Email>
+
+@{
+    ViewData["Title"] = "Home Page";
+}
+
+<div class="jumbotron text-center">
+    <h1>WELCOME</h1>
+</div>
+
+<div class="container">
+    <div class="row">
+        <div class="col-sm-12 d-flex justify-content-center align-items-center">
+            <div class="btn-group mt-3" role="group">
+                <a class="btn btn-primary btn-lg mr-3" href="@Url.Action("SendMail", "Mail")">
+                    <i class="fas fa-envelope"></i> Send Mail
+                </a>
+                <a class="btn btn-secondary btn-lg mr-3" href="@Url.Action("SentMails", "Mail")">
+                    <i class="fas fa-paper-plane"></i> View Sent Mails
+                </a>
+                <a class="btn btn-secondary btn-lg" href="@Url.Action("TemplateSend", "Mail")">
+                    <i class="fas fa-envelope-open"></i> Send Template Email
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+}

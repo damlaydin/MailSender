@@ -1,0 +1,138 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Group A Email Template</title>
+    <style type="text/css">
+        body {
+            margin: 0;
+            background-color: #cccccc;
+        }
+
+        table {
+            border-spacing: 0;
+        }
+
+        td {
+            padding: 0;
+        }
+
+        img {
+            border: 0;
+        }
+
+        .wrapper {
+            width: 100%;
+            table-layout: fixed;
+            background-color: #cccccc;
+            padding-bottom: 60px;
+        }
+
+        .main {
+            background-color: #ffffff;
+            margin: 0 auto;
+            width: 100%;
+            max-width: 600px;
+            border-spacing: 0;
+            font-family: sans-serif;
+            color: #4a4a4a;
+        }
+
+        .two-columns {
+            text-align: center;
+            font-size: 0;
+        }
+
+            .two-columns .column {
+                width: 100%;
+                max-width: 300px;
+                display: inline-block;
+                vertical-align: top;
+            }
+
+        .padding {
+            padding: 20px;
+        }
+
+        .button {
+            background-color: #289dcf;
+            color: #ffffff;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .footer {
+            background-color: #f4f4f4;
+            padding: 20px;
+            text-align: center;
+            font-size: 14px;
+            color: #666666;
+        }
+
+            .footer a {
+                color: #289dcf;
+                text-decoration: none;
+            }
+
+                .footer a:hover {
+                    text-decoration: underline;
+                }
+    </style>
+</head>
+<body>
+    <center class="wrapper">
+        <table class="main" width="100%">
+            <!-- BLUE BORDER -->
+            <tr>
+                <td height="8" style="background-color: #289dcf;"></td>
+            </tr>
+
+            <!-- Header Section -->
+            <tr>
+                <td>
+                    <table width="100%">
+                        <tr>
+                            <td class="two-columns">
+                                <table class="column">
+                                    <tr>
+                                        <td style="padding: 20px;">
+                                            <a href="http://localhost:5221">
+                                                <img src="cid:logo" alt="Logo" width="180" title="Logo" />
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+
+            <!-- Title, Text, Button Section -->
+            <tr>
+                <td class="padding">
+                    <h2>Welcome, {{FirstName}} {{LastName}}</h2>
+                    <p>We are excited to have you on board. Welcome!</p>
+                    <a href="http://localhost:5221" class="button">Get Started</a>
+                </td>
+            </tr>
+            <!-- Banner Image-->
+            <tr>
+                <td>
+                    <img src="cid:welcome" alt="Welcome" width="100%" height="200" title="Welcome" />
+                </td>
+            </tr>
+
+            <!-- BLUE BORDER -->
+            <tr>
+                <td height="15" style="background-color: #289dcf;"></td>
+            </tr>
+        </table>
+    </center>
+</body>
+</html>
