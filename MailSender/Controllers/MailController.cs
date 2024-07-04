@@ -198,6 +198,7 @@ namespace MailSender.Controllers
             return Json(new { location = fileUrl });
         }
 
+        /*
         public IActionResult TemplateSend()
         {
             // Get the list of groups from the database
@@ -338,6 +339,8 @@ namespace MailSender.Controllers
             TempData["SuccessMessage"] = "Email updated and sent successfully!";
             return RedirectToAction(nameof(SentMails));
         }
+        
+         */
 
     }
 }

@@ -25,9 +25,24 @@
 </form>
 <br>
 
+<h2>Update Template</h2>
+<form asp-action="UpdateTemplate" method="post">
+    <div class="form-group">
+        <label for="UpdateTemplateName">Select Template to Update</label>
+        <select asp-for="UpdateTemplateName" class="form-control" asp-items="Model.Templates">
+            <option value="">-- Select a Template --</option>
+        </select>
+        <span asp-validation-for="UpdateTemplateName" class="text-danger"></span>
+    </div>
+    <button type="submit" class="btn btn-secondary">Update Template</button>
+</form>
+<br>
+
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
 }
+
+
 
 
 

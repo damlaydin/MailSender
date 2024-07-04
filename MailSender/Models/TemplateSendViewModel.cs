@@ -13,5 +13,10 @@ namespace MailSender.Models
         [Required(ErrorMessage = "Please select a template.")]
         public string TemplateName { get; set; }
         public List<SelectListItem> Templates { get; set; }
+        public string UpdateTemplateName { get; set; }
+        public string TemplateContent { get; set; }
+        public IFormFile LogoImage { get; set; }
+        public IFormFile BannerImage { get; set; }
+
     }
 }
