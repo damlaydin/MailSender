@@ -162,17 +162,19 @@ namespace MailSender.Controllers
             var baseUrl = $"{request.Scheme}://{request.Host}{request.PathBase}";
             var emailBody = bodyTemplate.Replace("{{FirstName}}", user.FirstName).Replace("{{LastName}}", user.LastName);
 
+
+            //sending different image for each template
             List<string> imagePaths = new List<string>();
 
             if (templateName == "TemplateEmailGroupA.html")
             {
-                imagePaths.Add(Path.Combine("wwwroot/images", "thankYou.jpg"));
-                imagePaths.Add(Path.Combine("wwwroot/images", "logo.jpg"));
+                imagePaths.Add(@"C:\Users\user\Desktop\MailSender\MailSender\wwwroot\images\welcome.jpg");
+                imagePaths.Add(@"C:\Users\user\Desktop\MailSender\MailSender\wwwroot\images\logo.jpg");
             }
             else if (templateName == "TemplateEmailGroupB.html")
             {
-                imagePaths.Add(Path.Combine("wwwroot/images", "welcome.jpg"));
-                imagePaths.Add(Path.Combine("wwwroot/images", "logo.jpg"));
+                imagePaths.Add(@"C:\Users\user\Desktop\MailSender\MailSender\wwwroot\images\thankYou.jpg");
+                imagePaths.Add(@"C:\Users\user\Desktop\MailSender\MailSender\wwwroot\images\logo.jpg");
             }
 
             if (attachments != null && attachments.Count > 0)
@@ -193,6 +195,18 @@ namespace MailSender.Controllers
             }
 
             await _emailService.SendEmailAsync(new List<string> { user.Email }, subject, emailBody, attachments, imagePaths);
+
+            var sentEmail = new SentEmail
+            {
+                Subject = subject,
+                Body = emailBody,
+                SentDate = DateTime.Now,
+                SentTo = user.Email
+            };
+
+            // Add to database and save changes
+            _context.SentEmails.Add(sentEmail);
+            await _context.SaveChangesAsync();
         }
     }
 }
