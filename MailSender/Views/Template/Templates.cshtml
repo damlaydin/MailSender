@@ -1,0 +1,117 @@
+﻿@model MailSender.Models.TemplateSendViewModel
+
+@{
+    ViewData["Title"] = "Templates";
+}
+
+<h1>Templates</h1>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Subject</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var template in Model.Templates)
+        {
+            <!-- show template subjects -->
+            <tr>
+                <td>@template.Text</td>
+                <td>
+                    <div class="dropdown">
+                        <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                            Actions
+                        </button>
+                        <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                            <a class="dropdown-item" href="#" data-toggle="modal" data-target="#updateModal" data-name="@template.Value">
+                                Update  <i class="fas fa-pencil-alt"></i>
+                            </a>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<!-- Modal -->
+<div class="modal fade" id="updateModal" tabindex="-1" aria-labelledby="updateModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="updateModalLabel">Update Template</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="updateTemplateForm">
+                    <input type="hidden" id="templateName" name="templateName" />
+                    <div class="form-group">
+                        <label for="templateContent">Content</label>
+                        <textarea id="templateContent" name="templateContent" class="form-control"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="saveTemplateButton">Save changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        tinymce.init({
+            selector: '#templateContent',
+            height: 400,
+            plugins: 'link code lists advlist',
+            toolbar: 'undo redo | bold italic | alignleft aligncenter alignright alignjustify | indent outdent | bullist numlist | link',
+        });
+
+        $('#updateModal').on('show.bs.modal', function (event) {
+            var button = $(event.relatedTarget); // Button that triggered the modal
+            var templateName = button.data('name'); // Extract info from data-* attributes
+
+            // Update the modal's content
+            var modal = $(this);
+            modal.find('#templateName').val(templateName);
+
+            // Fetch the template content
+            $.ajax({
+                url: '@Url.Action("GetTemplateContent", "Template")',
+                method: 'GET',
+                data: { templateName: templateName },
+                success: function (response) {
+                    tinymce.get('templateContent').setContent(response.content);
+                },
+                error: function () {
+                    alert('An error occurred while fetching the template content');
+                }
+            });
+        });
+
+        $('#saveTemplateButton').click(function () {
+            var templateName = $('#templateName').val();
+            var templateContent = tinymce.get('templateContent').getContent();
+
+            $.ajax({
+                url: '@Url.Action("UpdateTemplate", "Template")',
+                method: 'POST',
+                data: {
+                    templateName: templateName,
+                    templateContent: templateContent
+                },
+                success: function (response) {
+                    alert('Template updated successfully');
+                    $('#updateModal').modal('hide');
+                },
+                error: function () {
+                    alert('An error occurred while updating the template');
+                }
+            });
+        });
+    </script>
+}

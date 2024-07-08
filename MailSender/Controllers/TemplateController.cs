@@ -9,6 +9,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using System.Text.RegularExpressions;
 
 namespace MailSender.Controllers
 {
@@ -29,112 +30,16 @@ namespace MailSender.Controllers
         {
             var groups = GetGroups();
             var templates = GetTemplates();
+            var users = GetUsers();
 
             var viewModel = new TemplateSendViewModel
             {
                 Groups = groups,
-                Templates = templates
+                Templates = templates,
+                Users = users
             };
 
             return View(viewModel);
-        }
-
-        [HttpGet]
-        public async Task<IActionResult> GetTemplateContent(string templateName)
-        {
-            if (string.IsNullOrEmpty(templateName))
-            {
-                return BadRequest("Template name is required");
-            }
-
-            string templatePath = Path.Combine(Directory.GetCurrentDirectory(), "EmailTemplates", templateName);
-            if (!System.IO.File.Exists(templatePath))
-            {
-                return NotFound("Template not found");
-            }
-
-            string templateContent = await System.IO.File.ReadAllTextAsync(templatePath);
-            return Content(templateContent);
-        }
-
-
-
-        [HttpPost]
-        public async Task<IActionResult> SendTemplateEmail(TemplateSendViewModel model)
-        {
-            _logger.LogInformation("SendTemplateEmail POST action started.");
-
-            string subject = $"Email for {model.GroupName}";
-            string templatePath = Path.Combine(Directory.GetCurrentDirectory(), "EmailTemplates", model.TemplateName);
-            string bodyTemplate = await System.IO.File.ReadAllTextAsync(templatePath);
-
-            var baseUrl = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}{HttpContext.Request.PathBase}";
-            bodyTemplate = bodyTemplate.Replace("{{BaseUrl}}", baseUrl);
-
-            var group = await _context.Groups.Include(g => g.GroupMembers).ThenInclude(m => m.User).FirstOrDefaultAsync(g => g.GroupName == model.GroupName);
-            if (group == null || !group.GroupMembers.Any())
-            {
-                _logger.LogWarning($"No users found in {model.GroupName}.");
-                TempData["ErrorMessage"] = $"No users found in {model.GroupName}.";
-                return RedirectToAction("TemplateSend");
-            }
-
-            foreach (var member in group.GroupMembers)
-            {
-                string body = bodyTemplate.Replace("{{FirstName}}", member.User.FirstName).Replace("{{LastName}}", member.User.LastName);
-                await SendEmail(member.User, subject, body, null, model.TemplateName);
-            }
-
-            TempData["SuccessMessage"] = $"Template emails sent successfully to {model.GroupName}!";
-            return RedirectToAction("SentMails", "Mail");
-        }
-
-        [HttpGet]
-        public IActionResult UpdateTemplate()
-        {
-            var model = new TemplateSendViewModel
-            {
-                Groups = GetGroups(),
-                Templates = GetTemplates()
-            };
-
-            return View(model);
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> UpdateTemplate(TemplateSendViewModel model)
-        {
-            if (ModelState.IsValid)
-            {
-                string templatePath = Path.Combine(Directory.GetCurrentDirectory(), "EmailTemplates", model.TemplateName);
-
-                // Save the template content
-                await System.IO.File.WriteAllTextAsync(templatePath, model.TemplateContent);
-
-                // Save uploaded images if any
-                if (model.LogoImage != null)
-                {
-                    var logoPath = Path.Combine("wwwroot/images", "logo.png");
-                    using (var stream = new FileStream(logoPath, FileMode.Create))
-                    {
-                        await model.LogoImage.CopyToAsync(stream);
-                    }
-                }
-                if (model.BannerImage != null)
-                {
-                    var bannerPath = Path.Combine("wwwroot/images", "welcome.png");
-                    using (var stream = new FileStream(bannerPath, FileMode.Create))
-                    {
-                        await model.BannerImage.CopyToAsync(stream);
-                    }
-                }
-
-                ViewBag.Message = "Template updated successfully.";
-            }
-
-            model.Groups = GetGroups();
-            model.Templates = GetTemplates();
-            return View(model);
         }
 
         private List<SelectListItem> GetGroups()
@@ -156,14 +61,82 @@ namespace MailSender.Controllers
             }).ToList();
         }
 
+        private List<SelectListItem> GetUsers()
+        {
+            return _context.Users.Select(u => new SelectListItem
+            {
+                Value = u.Id.ToString(),
+                Text = $"{u.FirstName} {u.LastName}"
+            }).ToList();
+        }
+
+        public IActionResult Templates()
+        {
+            var templates = GetTemplates();
+            var viewModel = new TemplateSendViewModel
+            {
+                Templates = templates
+            };
+
+            return View(viewModel);
+        }
+
+
+        [HttpPost]
+        public async Task<IActionResult> SendTemplateEmail(TemplateSendViewModel model)
+        {
+            _logger.LogInformation("SendTemplateEmail POST action started.");
+
+            string subject = $"Email for selected groups";
+            string templatePath = Path.Combine(Directory.GetCurrentDirectory(), "EmailTemplates", model.TemplateName);
+            string bodyTemplate = await System.IO.File.ReadAllTextAsync(templatePath);
+
+            var baseUrl = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}{HttpContext.Request.PathBase}";
+            bodyTemplate = bodyTemplate.Replace("{{BaseUrl}}", baseUrl);
+
+            var recipients = new List<User>();
+
+            // Get users from selected groups
+            if (model.SelectedGroupNames != null && model.SelectedGroupNames.Count > 0)
+            {
+                foreach (var groupName in model.SelectedGroupNames)
+                {
+                    var group = await _context.Groups.Include(g => g.GroupMembers).ThenInclude(m => m.User).FirstOrDefaultAsync(g => g.GroupName == groupName);
+                    if (group != null && group.GroupMembers.Any())
+                    {
+                        recipients.AddRange(group.GroupMembers.Select(m => m.User));
+                    }
+                }
+            }
+
+            // Get additional users if any
+            if (model.SelectedUserIds != null && model.SelectedUserIds.Count > 0)
+            {
+                var additionalUsers = await _context.Users.Where(u => model.SelectedUserIds.Contains(u.Id.ToString())).ToListAsync();
+                recipients.AddRange(additionalUsers);
+            }
+
+            recipients = recipients.Distinct().ToList();
+
+            foreach (var user in recipients)
+            {
+                string body = bodyTemplate.Replace("{{FirstName}}", user.FirstName).Replace("{{LastName}}", user.LastName);
+                await SendEmail(user, subject, body, null, model.TemplateName);
+            }
+
+            TempData["SuccessMessage"] = $"Template emails sent successfully!";
+            return RedirectToAction("SentMails", "Mail");
+        }
+
+
+
         private async Task SendEmail(User user, string subject, string bodyTemplate, List<IFormFile> attachments, string templateName)
         {
             var request = HttpContext.Request;
             var baseUrl = $"{request.Scheme}://{request.Host}{request.PathBase}";
             var emailBody = bodyTemplate.Replace("{{FirstName}}", user.FirstName).Replace("{{LastName}}", user.LastName);
 
-
-            //sending different image for each template
+            // sending different image for each template
             List<string> imagePaths = new List<string>();
 
             if (templateName == "TemplateEmailGroupA.html")
@@ -207,6 +180,19 @@ namespace MailSender.Controllers
             // Add to database and save changes
             _context.SentEmails.Add(sentEmail);
             await _context.SaveChangesAsync();
+        }
+
+        [HttpGet]
+        public IActionResult GetTemplateContent(string templateName)
+        {
+            var templatePath = Path.Combine(Directory.GetCurrentDirectory(), "EmailTemplates", templateName);
+            if (!System.IO.File.Exists(templatePath))
+            {
+                return NotFound();
+            }
+
+            var templateContent = System.IO.File.ReadAllText(templatePath);
+            return Json(new { content = templateContent });
         }
     }
 }

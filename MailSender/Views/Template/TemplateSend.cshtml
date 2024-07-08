@@ -5,57 +5,37 @@
 }
 
 <h2>Send Template Email</h2>
-<!-- Drop down type -->
+
 <form asp-action="SendTemplateEmail" method="post">
     <div class="form-group">
-        <label for="GroupName">Select Group</label>
-        <select asp-for="GroupName" class="form-control" asp-items="Model.Groups">
-            <option value="">-- Select a Group --</option>
+        <label for="SelectedGroupNames">Select Groups</label>
+        <select asp-for="SelectedGroupNames" class="form-control js-select2" asp-items="Model.Groups" multiple="multiple">
         </select>
-        <span asp-validation-for="GroupName" class="text-danger"></span>
+        <span asp-validation-for="SelectedGroupNames" class="text-danger"></span>
     </div>
     <div class="form-group">
         <label for="TemplateName">Select Template</label>
-        <select asp-for="TemplateName" class="form-control" asp-items="Model.Templates">
+        <select asp-for="TemplateName" class="form-control js-select2" asp-items="Model.Templates">
             <option value="">-- Select a Template --</option>
         </select>
         <span asp-validation-for="TemplateName" class="text-danger"></span>
     </div>
+    <div class="form-group">
+        <label for="SelectedUserIds">Select Additional Users (optional)</label>
+        <select asp-for="SelectedUserIds" class="form-control js-select2" asp-items="Model.Users" multiple="multiple">
+            <option value="">-- None --</option>
+        </select>
+    </div>
     <button type="submit" class="btn btn-primary">Send Mail</button>
 </form>
-<br>
-
-<h2>Update Template</h2>
-<form asp-action="UpdateTemplate" method="post">
-    <div class="form-group">
-        <label for="UpdateTemplateName">Select Template to Update</label>
-        <select asp-for="UpdateTemplateName" class="form-control" asp-items="Model.Templates">
-            <option value="">-- Select a Template --</option>
-        </select>
-        <span asp-validation-for="UpdateTemplateName" class="text-danger"></span>
-    </div>
-    <button type="submit" class="btn btn-secondary">Update Template</button>
-</form>
-<br>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            $('.js-select2').select2({
+        });
+    </script>
 }
-
-
-
-
-
-<!-- Button  type
-<form asp-action="SendTemplateEmailAll" method="post">
-    <button type="submit" class="btn btn-primary">Send to All Users</button>
-</form>
-<br>
-<form asp-action="SendTemplateEmailGroupA" method="post">
-    <button type="submit" class="btn btn-primary">Send to Group A</button>
-</form>
-<br>
-<form asp-action="SendTemplateEmailGroupB" method="post">
-    <button type="submit" class="btn btn-primary">Send to Group B</button>
-</form>
--->

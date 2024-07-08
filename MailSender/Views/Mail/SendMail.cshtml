@@ -46,43 +46,10 @@
     <script>
         tinymce.init({
             selector: 'textarea',
-            height: 400, 
-            plugins: 'image media link code lists advlist media',
-            toolbar: 'undo redo | blocks | bold italic | alignleft aligncenter alignright alignjustify | indent outdent | image | media | insertfile',
+            height: 400,
+            plugins: 'link code lists advlist',
+            toolbar: 'undo redo | bold italic | alignleft aligncenter alignright alignjustify | indent outdent | bullist numlist | link',
 
-            // For file upload with TinyMCE
-            images_upload_url: '@Url.Action("UploadFile", "Mail")',
-            automatic_uploads: true,
-            file_picker_types: 'file image media',
-            file_picker_callback: function (callback, value, meta) {
-                var input = document.createElement('input');
-                input.setAttribute('type', 'file');
-                input.setAttribute('accept', meta.filetype === 'image' ? 'image/*' : (meta.filetype === 'media' ? 'video/*' : '*/*'));
-
-                input.onchange = function () {
-                    var file = this.files[0];
-                    var reader = new FileReader();
-
-                    reader.onload = function () {
-                        var formData = new FormData();
-                        formData.append('file', file);
-
-                        fetch('@Url.Action("UploadFile", "Mail")', {
-                            method: 'POST',
-                            body: formData
-                        }).then(response => response.json())
-                            .then(result => {
-                                if (result.location) {
-                                    callback(result.location, { alt: file.name });
-                                }
-                            });
-                    };
-
-                    reader.readAsDataURL(file);
-                };
-
-                input.click();
-            },
             setup: function (editor) {
                 editor.on('init', function () {
                     editor.setContent('Hey {{FirstName}} {{LastName}}');
