@@ -68,7 +68,7 @@ namespace MailSender.Controllers
                 imagePaths.Add(@"C:\Users\user\Desktop\MailSender\MailSender\wwwroot\images\logo.jpg");
             }
 
-
+/*
             // Add attachment links to the email body
             if (attachments != null && attachments.Count > 0)
             {
@@ -88,8 +88,9 @@ namespace MailSender.Controllers
                     emailBody += $"<a href=\"{fileUrl}\" target=\"_blank\">{attachment.FileName}</a><br/>";
                 }
             }
+*/
 
-            await _emailService.SendEmailAsync(new List<string> { user.Email }, subject, emailBody, attachments, imagePaths);
+            await _emailService.SendEmailAsync(new List<string> { user.Email }, subject, emailBody, imagePaths);
 
             var sentEmail = new SentEmail
             {

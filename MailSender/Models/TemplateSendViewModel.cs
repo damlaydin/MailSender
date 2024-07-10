@@ -20,11 +20,5 @@ namespace MailSender.Models
         public List<string> SelectedUserIds { get; set; }
         public IEnumerable<SelectListItem> Users { get; set; }
 
-        /*
-                public string UpdateTemplateName { get; set; }
-                public string TemplateContent { get; set; }
-                public IFormFile LogoImage { get; set; }
-                public IFormFile BannerImage { get; set; }
-        */
     }
 }

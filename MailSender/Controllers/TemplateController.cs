@@ -1,14 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using MailSender.Data;
 using MailSender.Models;
-using MailSender.Data;
-using Microsoft.Extensions.Logging;
-using Microsoft.EntityFrameworkCore;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.EntityFrameworkCore;
 using System.Text.RegularExpressions;
 
 namespace MailSender.Controllers
@@ -53,11 +47,10 @@ namespace MailSender.Controllers
 
         private List<SelectListItem> GetTemplates()
         {
-            var templateNames = new List<string> { "TemplateEmailGroupA.html", "TemplateEmailGroupB.html" };
-            return templateNames.Select(t => new SelectListItem
+            return _context.Templates.Select(t => new SelectListItem
             {
-                Value = t,
-                Text = t.Replace(".html", "")
+                Value = t.Name,
+                Text = t.Name
             }).ToList();
         }
 
@@ -87,12 +80,22 @@ namespace MailSender.Controllers
         {
             _logger.LogInformation("SendTemplateEmail POST action started.");
 
-            string subject = $"Email for selected groups";
-            string templatePath = Path.Combine(Directory.GetCurrentDirectory(), "EmailTemplates", model.TemplateName);
-            string bodyTemplate = await System.IO.File.ReadAllTextAsync(templatePath);
+            var template = await _context.Templates
+                .Include(t => t.TemplateImages)
+                .FirstOrDefaultAsync(t => t.Name == model.TemplateName);
+
+            if (template == null)
+            {
+                TempData["ErrorMessage"] = $"Template {model.TemplateName} not found.";
+                return RedirectToAction("TemplateSend");
+            }
+
+            string subject = template.Subject;
+            string bodyTemplate = template.Body;
 
             var baseUrl = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}{HttpContext.Request.PathBase}";
             bodyTemplate = bodyTemplate.Replace("{{BaseUrl}}", baseUrl);
+
 
             var recipients = new List<User>();
 
@@ -118,38 +121,27 @@ namespace MailSender.Controllers
 
             recipients = recipients.Distinct().ToList();
 
+            var imagePaths = template.TemplateImages.Select(ti => ti.ImagePath).ToList();
+
             foreach (var user in recipients)
             {
                 string body = bodyTemplate.Replace("{{FirstName}}", user.FirstName).Replace("{{LastName}}", user.LastName);
-                await SendEmail(user, subject, body, null, model.TemplateName);
+                await SendEmail(user, subject, body, imagePaths);
             }
 
             TempData["SuccessMessage"] = $"Template emails sent successfully!";
-            return RedirectToAction("SentMails", "Mail");
+            return RedirectToAction("Index", "Home");
         }
 
 
 
-        private async Task SendEmail(User user, string subject, string bodyTemplate, List<IFormFile> attachments, string templateName)
+        private async Task SendEmail(User user, string subject, string bodyTemplate,List<string> imagePaths)
         {
             var request = HttpContext.Request;
             var baseUrl = $"{request.Scheme}://{request.Host}{request.PathBase}";
             var emailBody = bodyTemplate.Replace("{{FirstName}}", user.FirstName).Replace("{{LastName}}", user.LastName);
 
-            // sending different image for each template
-            List<string> imagePaths = new List<string>();
-
-            if (templateName == "TemplateEmailGroupA.html")
-            {
-                imagePaths.Add(@"C:\Users\user\Desktop\MailSender\MailSender\wwwroot\images\welcome.jpg");
-                imagePaths.Add(@"C:\Users\user\Desktop\MailSender\MailSender\wwwroot\images\logo.jpg");
-            }
-            else if (templateName == "TemplateEmailGroupB.html")
-            {
-                imagePaths.Add(@"C:\Users\user\Desktop\MailSender\MailSender\wwwroot\images\thankYou.jpg");
-                imagePaths.Add(@"C:\Users\user\Desktop\MailSender\MailSender\wwwroot\images\logo.jpg");
-            }
-
+            /*
             if (attachments != null && attachments.Count > 0)
             {
                 emailBody += "<br/><br/>Attachments:<br/>";
@@ -166,8 +158,9 @@ namespace MailSender.Controllers
                     emailBody += $"<a href=\"{fileUrl}\" target=\"_blank\">{attachment.FileName}</a><br/>";
                 }
             }
+            */
 
-            await _emailService.SendEmailAsync(new List<string> { user.Email }, subject, emailBody, attachments, imagePaths);
+            await _emailService.SendEmailAsync(new List<string> { user.Email }, subject, emailBody, imagePaths);
 
             var sentEmail = new SentEmail
             {
@@ -182,17 +175,79 @@ namespace MailSender.Controllers
             await _context.SaveChangesAsync();
         }
 
-        [HttpGet]
-        public IActionResult GetTemplateContent(string templateName)
+        [HttpPost]
+        public async Task<IActionResult> UpdateTemplate(string templateName, string templateContent)
         {
-            var templatePath = Path.Combine(Directory.GetCurrentDirectory(), "EmailTemplates", templateName);
-            if (!System.IO.File.Exists(templatePath))
+            var template = await _context.Templates.FirstOrDefaultAsync(t => t.Name == templateName);
+            if (template == null)
             {
                 return NotFound();
             }
 
-            var templateContent = System.IO.File.ReadAllText(templatePath);
+            var baseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
+            templateContent = ReplaceUrlsWithCid(templateContent, baseUrl);
+
+            template.Body = templateContent;
+            _context.Templates.Update(template);
+            await _context.SaveChangesAsync();
+
+            return Ok();
+        }
+
+        private string ReplaceUrlsWithCid(string content, string baseUrl)
+        {
+            return Regex.Replace(content, $"{baseUrl}/images/(\\w+).jpg", "cid:$1");
+        }
+
+
+        [HttpGet]
+        public IActionResult GetTemplateContent(string templateName)
+        {
+            var template = _context.Templates.FirstOrDefault(t => t.Name == templateName);
+            if (template == null)
+            {
+                return NotFound();
+            }
+
+            var baseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
+            var templateContent = ReplaceCidWithUrls(template.Body, baseUrl);
+
             return Json(new { content = templateContent });
         }
+
+        private string ReplaceCidWithUrls(string content, string baseUrl)
+        {
+            return Regex.Replace(content, @"cid:(\w+)", $"{baseUrl}/images/$1.jpg");
+        }
+
+
+        [HttpPost]
+        public async Task<IActionResult> UploadImage(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(new { location = string.Empty });
+            }
+
+            var fileName = Path.GetFileName(file.FileName);
+            var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/images", fileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            // var fileUrl = Url.Content($"~/images/{fileName}");
+
+            var baseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
+            var fileUrl = $"{baseUrl}/images/{fileName}";
+
+            return Ok(new { location = fileUrl });
+        }
+
+
+
     }
 }
+
+

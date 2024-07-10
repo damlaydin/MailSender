@@ -22,6 +22,8 @@ namespace MailSender.Data
         public DbSet<EmailAttachment> EmailAttachments { get; set; }
         public DbSet<Group> Groups { get; set; }
         public DbSet<GroupMember> GroupMembers { get; set; }
+        public DbSet<Template> Templates { get; set; }
+        public DbSet<TemplateImage> TemplateImages { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -30,6 +32,13 @@ namespace MailSender.Data
                 .WithOne(a => a.SentEmail)
                 .HasForeignKey(a => a.SentEmailId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<TemplateImage>()
+            .HasOne(ti => ti.Template)
+            .WithMany(t => t.TemplateImages)
+            .HasForeignKey(ti => ti.TemplateId);
+
+            base.OnModelCreating(modelBuilder);
         }
     }
 }

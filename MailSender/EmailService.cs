@@ -19,7 +19,7 @@ namespace MailSender
             _configuration = configuration;
         }
 
-        public async Task SendEmailAsync(List<string> toEmails, string subject, string body, List<IFormFile> attachments = null, List<string> imagePaths = null)
+        public async Task SendEmailAsync(List<string> toEmails, string subject, string body, List<string> imagePaths = null)
         {
             var message = new MimeMessage();
             message.From.Add(new MailboxAddress(_configuration["EmailSettings:SenderName"], _configuration["EmailSettings:SmtpUser"]));
@@ -56,7 +56,7 @@ namespace MailSender
                     bodyBuilder.HtmlBody = bodyBuilder.HtmlBody.Replace($"cid:{Path.GetFileNameWithoutExtension(imagePath)}", $"cid:{linkedResource.ContentId}");
                 }
             }
-
+            /*
             if (attachments != null && attachments.Count > 0)
             {
                 foreach (var attachment in attachments)
@@ -71,7 +71,7 @@ namespace MailSender
                         }
                     }
                 }
-            }
+            }*/
 
             message.Body = bodyBuilder.ToMessageBody();
 

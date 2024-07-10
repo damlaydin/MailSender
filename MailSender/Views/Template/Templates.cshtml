@@ -37,7 +37,7 @@
 
 <!-- Modal -->
 <div class="modal fade" id="updateModal" tabindex="-1" aria-labelledby="updateModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="updateModalLabel">Update Template</h5>
@@ -66,16 +66,55 @@
     <script>
         tinymce.init({
             selector: '#templateContent',
-            height: 400,
-            plugins: 'link code lists advlist',
-            toolbar: 'undo redo | bold italic | alignleft aligncenter alignright alignjustify | indent outdent | bullist numlist | link',
+            height: 500,
+            width:1000,
+            plugins: 'link code lists advlist image',
+            toolbar: 'undo redo | bold italic | alignleft aligncenter alignright alignjustify | indent outdent | bullist numlist | link image',
+            relative_urls: false,
+            remove_script_host: false,
+            convert_urls: false,
+            document_base_url: '@Url.Content("~/")',
+            setup: function (editor) {
+                editor.on('init', function () {
+                    var iframe = editor.getDoc().body;
+                    iframe.style.transform = "scale(1.0)"; 
+                });
+            },
+            file_picker_callback: function (callback, value, meta) {
+                if (meta.filetype === 'image') {
+                    var input = document.createElement('input');
+                    input.setAttribute('type', 'file');
+                    input.setAttribute('accept', 'image/*');
+                    input.onchange = function () {
+                        var file = this.files[0];
+                        var formData = new FormData();
+                        formData.append('file', file);
+
+                        fetch('@Url.Action("UploadImage", "Template")', {
+                            method: 'POST',
+                            body: formData
+                        })
+                            .then(response => response.json())
+                            .then(result => {
+                                if (result.location) {
+                                    callback(result.location, { alt: file.name });
+                                } else {
+                                    alert('Upload failed');
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                alert('An error occurred while uploading the image');
+                            });
+                    };
+                    input.click();
+                }
+            }
         });
 
         $('#updateModal').on('show.bs.modal', function (event) {
-            var button = $(event.relatedTarget); // Button that triggered the modal
-            var templateName = button.data('name'); // Extract info from data-* attributes
-
-            // Update the modal's content
+            var button = $(event.relatedTarget);
+            var templateName = button.data('name');
             var modal = $(this);
             modal.find('#templateName').val(templateName);
 
