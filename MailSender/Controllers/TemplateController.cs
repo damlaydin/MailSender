@@ -2,7 +2,9 @@
 using MailSender.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using SignalRChat.Hubs;
 using System.Text.RegularExpressions;
 
 namespace MailSender.Controllers
@@ -12,12 +14,15 @@ namespace MailSender.Controllers
         private readonly ILogger<TemplateController> _logger;
         private readonly ApplicationDbContext _context;
         private readonly EmailService _emailService;
+        private readonly IHubContext<ChatHub> _hubContext;
 
-        public TemplateController(ILogger<TemplateController> logger, ApplicationDbContext context, EmailService emailService)
+
+        public TemplateController(ILogger<TemplateController> logger, ApplicationDbContext context, EmailService emailService, IHubContext<ChatHub> hubContext)
         {
             _logger = logger;
             _context = context;
             _emailService = emailService;
+            _hubContext = hubContext;
         }
 
         public IActionResult TemplateSend()
@@ -47,6 +52,7 @@ namespace MailSender.Controllers
 
         private List<SelectListItem> GetTemplates()
         {
+
             return _context.Templates.Select(t => new SelectListItem
             {
                 Value = t.Name,
@@ -65,10 +71,14 @@ namespace MailSender.Controllers
 
         public IActionResult Templates()
         {
+            var groups = GetGroups();
+            var users = GetUsers();
             var templates = GetTemplates();
             var viewModel = new TemplateSendViewModel
             {
-                Templates = templates
+                Groups = groups,
+                Templates = templates,
+                Users = users
             };
 
             return View(viewModel);
@@ -78,7 +88,7 @@ namespace MailSender.Controllers
         [HttpPost]
         public async Task<IActionResult> SendTemplateEmail(TemplateSendViewModel model)
         {
-            _logger.LogInformation("SendTemplateEmail POST action started.");
+            //_logger.LogInformation("SendTemplateEmail POST action started.");
 
             var template = await _context.Templates
                 .Include(t => t.TemplateImages)
@@ -127,7 +137,11 @@ namespace MailSender.Controllers
             {
                 string body = bodyTemplate.Replace("{{FirstName}}", user.FirstName).Replace("{{LastName}}", user.LastName);
                 await SendEmail(user, subject, body, imagePaths);
+
             }
+
+            //send notification
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", "System", "Email sent successfully.");
 
             TempData["SuccessMessage"] = $"Template emails sent successfully!";
             return RedirectToAction("Index", "Home");
@@ -140,25 +154,6 @@ namespace MailSender.Controllers
             var request = HttpContext.Request;
             var baseUrl = $"{request.Scheme}://{request.Host}{request.PathBase}";
             var emailBody = bodyTemplate.Replace("{{FirstName}}", user.FirstName).Replace("{{LastName}}", user.LastName);
-
-            /*
-            if (attachments != null && attachments.Count > 0)
-            {
-                emailBody += "<br/><br/>Attachments:<br/>";
-                foreach (var attachment in attachments)
-                {
-                    var filePath = Path.Combine("wwwroot/uploads", attachment.FileName);
-                    var fileUrl = $"{baseUrl}/uploads/{attachment.FileName}";
-
-                    using (var fileStream = new FileStream(filePath, FileMode.Create))
-                    {
-                        await attachment.CopyToAsync(fileStream);
-                    }
-
-                    emailBody += $"<a href=\"{fileUrl}\" target=\"_blank\">{attachment.FileName}</a><br/>";
-                }
-            }
-            */
 
             await _emailService.SendEmailAsync(new List<string> { user.Email }, subject, emailBody, imagePaths);
 
