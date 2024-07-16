@@ -4,9 +4,8 @@ using System.Threading.Tasks;
 using MailKit.Net.Smtp;
 using Microsoft.Extensions.Configuration;
 using MimeKit;
-using Microsoft.AspNetCore.Http;
-using MailKit.Security;
 using MimeKit.Utils;
+using MailKit.Security;
 
 namespace MailSender
 {
@@ -56,26 +55,8 @@ namespace MailSender
                     bodyBuilder.HtmlBody = bodyBuilder.HtmlBody.Replace($"cid:{Path.GetFileNameWithoutExtension(imagePath)}", $"cid:{linkedResource.ContentId}");
                 }
             }
-            /*
-            if (attachments != null && attachments.Count > 0)
-            {
-                foreach (var attachment in attachments)
-                {
-                    if (attachment.Length > 0)
-                    {
-                        // Copy the attachment to a memory stream
-                        using (var stream = new MemoryStream())
-                        {
-                            await attachment.CopyToAsync(stream);
-                            bodyBuilder.Attachments.Add(attachment.FileName, stream.ToArray(), ContentType.Parse(attachment.ContentType));
-                        }
-                    }
-                }
-            }*/
 
             message.Body = bodyBuilder.ToMessageBody();
-
-
             // Create an SmtpClient to send the email
             using (var client = new SmtpClient())
             {
@@ -85,7 +66,5 @@ namespace MailSender
                 await client.DisconnectAsync(true);
             }
         }
-
     }
 }
-

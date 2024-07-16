@@ -6,6 +6,10 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using SignalRChat.Hubs;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.Extensions.Logging;
 
 namespace MailSender.Controllers
 {
@@ -15,7 +19,6 @@ namespace MailSender.Controllers
         private readonly ApplicationDbContext _context;
         private readonly EmailService _emailService;
         private readonly IHubContext<ChatHub> _hubContext;
-
 
         public TemplateController(ILogger<TemplateController> logger, ApplicationDbContext context, EmailService emailService, IHubContext<ChatHub> hubContext)
         {
@@ -27,15 +30,11 @@ namespace MailSender.Controllers
 
         public IActionResult TemplateSend()
         {
-            var groups = GetGroups();
-            var templates = GetTemplates();
-            var users = GetUsers();
-
             var viewModel = new TemplateSendViewModel
             {
-                Groups = groups,
-                Templates = templates,
-                Users = users
+                Groups = GetGroups(),
+                Templates = GetTemplates(),
+                Users = GetUsers()
             };
 
             return View(viewModel);
@@ -52,7 +51,6 @@ namespace MailSender.Controllers
 
         private List<SelectListItem> GetTemplates()
         {
-
             return _context.Templates.Select(t => new SelectListItem
             {
                 Value = t.Name,
@@ -71,28 +69,20 @@ namespace MailSender.Controllers
 
         public IActionResult Templates()
         {
-            var groups = GetGroups();
-            var users = GetUsers();
-            var templates = GetTemplates();
             var viewModel = new TemplateSendViewModel
             {
-                Groups = groups,
-                Templates = templates,
-                Users = users
+                Groups = GetGroups(),
+                Templates = GetTemplates(),
+                Users = GetUsers()
             };
 
             return View(viewModel);
         }
 
-
         [HttpPost]
         public async Task<IActionResult> SendTemplateEmail(TemplateSendViewModel model)
         {
-            //_logger.LogInformation("SendTemplateEmail POST action started.");
-
-            var template = await _context.Templates
-                .Include(t => t.TemplateImages)
-                .FirstOrDefaultAsync(t => t.Name == model.TemplateName);
+            var template = await _context.Templates.FirstOrDefaultAsync(t => t.Name == model.TemplateName);
 
             if (template == null)
             {
@@ -105,7 +95,6 @@ namespace MailSender.Controllers
 
             var baseUrl = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}{HttpContext.Request.PathBase}";
             bodyTemplate = bodyTemplate.Replace("{{BaseUrl}}", baseUrl);
-
 
             var recipients = new List<User>();
 
@@ -121,7 +110,6 @@ namespace MailSender.Controllers
                     }
                 }
             }
-
             // Get additional users if any
             if (model.SelectedUserIds != null && model.SelectedUserIds.Count > 0)
             {
@@ -131,29 +119,48 @@ namespace MailSender.Controllers
 
             recipients = recipients.Distinct().ToList();
 
-            var imagePaths = template.TemplateImages.Select(ti => ti.ImagePath).ToList();
+            var imageCids = ExtractCidsFromHtml(bodyTemplate);
 
             foreach (var user in recipients)
             {
                 string body = bodyTemplate.Replace("{{FirstName}}", user.FirstName).Replace("{{LastName}}", user.LastName);
-                await SendEmail(user, subject, body, imagePaths);
-
+                await SendEmail(user, subject, body, imageCids);
             }
 
-            //send notification
             await _hubContext.Clients.All.SendAsync("ReceiveNotification", "System", "Email sent successfully.");
 
             TempData["SuccessMessage"] = $"Template emails sent successfully!";
             return RedirectToAction("Index", "Home");
         }
 
-
-
-        private async Task SendEmail(User user, string subject, string bodyTemplate,List<string> imagePaths)
+        private List<string> ExtractCidsFromHtml(string html)
         {
-            var request = HttpContext.Request;
-            var baseUrl = $"{request.Scheme}://{request.Host}{request.PathBase}";
+            var cids = new List<string>();
+            var cidRegex = new Regex(@"cid:(\w+)", RegexOptions.IgnoreCase);
+            var matches = cidRegex.Matches(html);
+            foreach (Match match in matches)
+            {
+                if (match.Groups.Count > 1)
+                {
+                    cids.Add(match.Groups[1].Value);
+                }
+            }
+            return cids;
+        }
+
+        private async Task SendEmail(User user, string subject, string bodyTemplate, List<string> imageCids)
+        {
             var emailBody = bodyTemplate.Replace("{{FirstName}}", user.FirstName).Replace("{{LastName}}", user.LastName);
+
+            var imagePaths = new List<string>();
+            foreach (var cid in imageCids)
+            {
+                var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/images", $"{cid}.jpg");
+                if (System.IO.File.Exists(filePath))
+                {
+                    imagePaths.Add(filePath);
+                }
+            }
 
             await _emailService.SendEmailAsync(new List<string> { user.Email }, subject, emailBody, imagePaths);
 
@@ -165,12 +172,10 @@ namespace MailSender.Controllers
                 SentTo = user.Email
             };
 
-            // Add to database and save changes
             _context.SentEmails.Add(sentEmail);
             await _context.SaveChangesAsync();
         }
 
-        [HttpPost]
         public async Task<IActionResult> UpdateTemplate(string templateName, string templateContent)
         {
             var template = await _context.Templates.FirstOrDefaultAsync(t => t.Name == templateName);
@@ -191,7 +196,18 @@ namespace MailSender.Controllers
 
         private string ReplaceUrlsWithCid(string content, string baseUrl)
         {
-            return Regex.Replace(content, $"{baseUrl}/images/(\\w+).jpg", "cid:$1");
+            var regex = new Regex(@"<img[^>]+src=""([^""]+)""[^>]*>", RegexOptions.IgnoreCase);
+            return regex.Replace(content, match =>
+            {
+                var src = match.Groups[1].Value;
+                if (src.StartsWith(baseUrl + "/images/"))
+                {
+                    var fileName = src.Substring((baseUrl + "/images/").Length);
+                    var cid = Path.GetFileNameWithoutExtension(fileName);
+                    return match.Value.Replace(src, $"cid:{cid}");
+                }
+                return match.Value;
+            });
         }
 
 
@@ -215,7 +231,6 @@ namespace MailSender.Controllers
             return Regex.Replace(content, @"cid:(\w+)", $"{baseUrl}/images/$1.jpg");
         }
 
-
         [HttpPost]
         public async Task<IActionResult> UploadImage(IFormFile file)
         {
@@ -232,17 +247,10 @@ namespace MailSender.Controllers
                 await file.CopyToAsync(stream);
             }
 
-            // var fileUrl = Url.Content($"~/images/{fileName}");
-
             var baseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
             var fileUrl = $"{baseUrl}/images/{fileName}";
 
             return Ok(new { location = fileUrl });
         }
-
-
-
     }
 }
-
-
