@@ -4,6 +4,12 @@
     ViewData["Title"] = "Templates";
 }
 
+<style>
+    .select2-container {
+        width: 100% !important;
+    }
+</style>
+
 <h1>Templates</h1>
 <table class="table table-striped">
     <thead>
@@ -15,7 +21,6 @@
     <tbody>
         @foreach (var template in Model.Templates)
         {
-            <!-- show template subjects -->
             <tr>
                 <td>@template.Text</td>
                 <td>
@@ -45,28 +50,52 @@
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
+
             <div class="modal-body">
                 <form id="updateTemplateForm">
                     <input type="hidden" id="templateName" name="templateName" />
+
                     <div class="form-group">
                         <label for="SelectedGroupNames">Select Groups</label>
-                        <select asp-for="SelectedGroupNames" class="form-control js-select2" asp-items="Model.Groups" multiple="multiple" style="width: 100%;">
+                        <select id="SelectedGroupNames" name="SelectedGroupNames" class="form-control js-select2" multiple="multiple">
+                            @foreach (var group in Model.Groups)
+                            {
+                                <option value="@group.Value">@group.Text</option>
+                            }
                         </select>
                         <span asp-validation-for="SelectedGroupNames" class="text-danger"></span>
                     </div>
+
                     <div class="form-group">
-                        <label for="SelectedUserIds">Select Additional Users (optional)</label>
-                        <select asp-for="SelectedUserIds" class="form-control js-select2" asp-items="Model.Users" multiple="multiple" style="width: 100%;">
+                        <label for="SelectedUserIds">Select Users</label>
+                        <select id="SelectedUserIds" name="SelectedUserIds" class="form-control js-select2" multiple="multiple">
+                            @foreach (var user in Model.Users)
+                            {
+                                <option value="@user.Value">@user.Text</option>
+                            }
                         </select>
+                        <span asp-validation-for="SelectedUserIds" class="text-danger"></span>
                     </div>
+
+                    <div class="form-group">
+                        <label for="templateVariables">Variables</label>
+                        <div id="templateVariables" class="mb-3"></div>
+                    </div>
+
+                    <div id="variableDescriptionBox" style="display: none; position: fixed; right: 20px; top: 20px; width: 300px; border: 1px solid #ccc; padding: 10px; background-color: #fff; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h5>Variable Description</h5>
+                            <button type="button" class="close" aria-label="Close" onclick="hideDescriptionBox()">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <p id="variableDescription"></p>
+                    </div>
+
                     <div class="form-group">
                         <label for="templateContent">Content</label>
                         <textarea id="templateContent" name="templateContent" class="form-control"></textarea>
                     </div>
-                    <!-- Popover Button -->
-                    <button type="button" class="btn btn-secondary" data-container="body" data-toggle="popover" data-placement="right" data-content="Vivamus.">
-                        <i class="fa-solid fa-circle-info"></i> Pop
-                    </button>
                 </form>
             </div>
             <div class="modal-footer">
@@ -79,22 +108,49 @@
 
 @section Scripts {
     <script>
+        function drag(event) {
+            event.dataTransfer.setData("text/plain", event.target.textContent.trim());
+        }
+
+        function drop(event) {
+            event.preventDefault();
+            const data = event.dataTransfer.getData("text/plain");
+            const editor = tinymce.get('templateContent');
+            editor.focus();
+            editor.selection.setContent(data);
+        }
+
+        function allowDrop(event) {
+            event.preventDefault();
+        }
+
+        function showDescription(description) {
+            const descriptionBox = document.getElementById('variableDescriptionBox');
+            const descriptionText = document.getElementById('variableDescription');
+            descriptionText.textContent = description;
+            descriptionBox.style.display = 'block';
+        }
+
+        function hideDescriptionBox() {
+            const descriptionBox = document.getElementById('variableDescriptionBox');
+            descriptionBox.style.display = 'none';
+        }
+
         tinymce.init({
             selector: '#templateContent',
-            height: 500,
-            width: 1000,
+            height: 800,
+            menubar: false,
             plugins: 'link code lists advlist image',
             toolbar: 'undo redo | bold italic | alignleft aligncenter alignright alignjustify | indent outdent | bullist numlist | link image',
+            setup: function (editor) {
+                editor.on('init', function () {
+                    editor.getDoc().body.style.transform = 'scale(1)';
+                });
+            },
             relative_urls: false,
             remove_script_host: false,
             convert_urls: false,
             document_base_url: '@Url.Content("~/")',
-            setup: function (editor) {
-                editor.on('init', function () {
-                    var iframe = editor.getDoc().body;
-                    iframe.style.transform = "scale(1.0)";
-                });
-            },
             file_picker_callback: function (callback, value, meta) {
                 if (meta.filetype === 'image') {
                     var input = document.createElement('input');
@@ -133,13 +189,22 @@
             var modal = $(this);
             modal.find('#templateName').val(templateName);
 
-            // Fetch the template content
             $.ajax({
-                url: '@Url.Action("GetTemplateContent", "Template")',
+                url: '@Url.Action("GetTemplateContentWithVariables", "Template")',
                 method: 'GET',
                 data: { templateName: templateName },
                 success: function (response) {
                     tinymce.get('templateContent').setContent(response.content);
+                    var variablesHtml = response.variableNames.map(function (variableName, index) {
+                        var variableDescription = response.variableDescriptions[index];
+                        return `
+                                    <span class="badge badge-secondary" draggable="true" ondragstart="drag(event)">
+                                        ${variableName}
+                                        <i class="fas fa-info-circle" onclick="showDescription('${variableDescription}')"></i>
+                                    </span>
+                                `;
+                    }).join(' ');
+                    $('#templateVariables').html(variablesHtml);
                 },
                 error: function () {
                     alert('An error occurred while fetching the template content');
@@ -150,14 +215,19 @@
         $('#saveTemplateButton').click(function () {
             var templateName = $('#templateName').val();
             var templateContent = tinymce.get('templateContent').getContent();
+            var selectedGroupNames = $('#SelectedGroupNames').val();
+            var selectedUserIds = $('#SelectedUserIds').val();
 
             $.ajax({
                 url: '@Url.Action("UpdateTemplate", "Template")',
                 method: 'POST',
                 data: {
-                    templateName: templateName,
-                    templateContent: templateContent
+                    TemplateName: templateName,
+                    TemplateContent: templateContent,
+                    SelectedGroupNames: selectedGroupNames,
+                    SelectedUserIds: selectedUserIds
                 },
+                traditional: true,
                 success: function (response) {
                     alert('Template updated successfully');
                     $('#updateModal').modal('hide');
@@ -170,9 +240,9 @@
 
         $(document).ready(function () {
             $('.js-select2').select2({
-                width: '100%' 
+                placeholder: "Select",
+                allowClear: true
             });
-            $('[data-toggle="popover"]').popover();
         });
     </script>
     <partial name="_ValidationScriptsPartial" />

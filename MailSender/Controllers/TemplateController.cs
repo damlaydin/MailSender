@@ -80,41 +80,46 @@ namespace MailSender.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> SendTemplateEmail(TemplateSendViewModel model)
+        public async Task<IActionResult> SendTemplateEmail(string templateName)
         {
-            var template = await _context.Templates.FirstOrDefaultAsync(t => t.Name == model.TemplateName);
+            var template = await _context.Templates
+                .Include(t => t.TemplateGroups)
+                .ThenInclude(tg => tg.Group)
+                .ThenInclude(g => g.GroupMembers)
+                .ThenInclude(gm => gm.User)
+                .Include(t => t.TemplateUsers)
+                .ThenInclude(tu => tu.User)
+                .FirstOrDefaultAsync(t => t.Name == templateName);
 
             if (template == null)
             {
-                TempData["ErrorMessage"] = $"Template {model.TemplateName} not found.";
-                return RedirectToAction("TemplateSend");
+                TempData["ErrorMessage"] = $"Template {templateName} not found.";
+                return RedirectToAction("Index", "Home");
             }
 
             string subject = template.Subject;
             string bodyTemplate = template.Body;
 
             var baseUrl = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}{HttpContext.Request.PathBase}";
-            bodyTemplate = bodyTemplate.Replace("{{BaseUrl}}", baseUrl);
+            bodyTemplate = ReplaceUrlsWithCid(bodyTemplate, baseUrl);
 
             var recipients = new List<User>();
 
-            // Get users from selected groups
-            if (model.SelectedGroupNames != null && model.SelectedGroupNames.Count > 0)
+            if (template.TemplateGroups != null && template.TemplateGroups.Count > 0)
             {
-                foreach (var groupName in model.SelectedGroupNames)
+                foreach (var templateGroup in template.TemplateGroups)
                 {
-                    var group = await _context.Groups.Include(g => g.GroupMembers).ThenInclude(m => m.User).FirstOrDefaultAsync(g => g.GroupName == groupName);
-                    if (group != null && group.GroupMembers.Any())
-                    {
-                        recipients.AddRange(group.GroupMembers.Select(m => m.User));
-                    }
+                    if (templateGroup.Group.GroupMembers != null && templateGroup.Group.GroupMembers.Count > 0)
+
+                        recipients.AddRange(templateGroup.Group.GroupMembers.Select(m => m.User));
+
                 }
             }
-            // Get additional users if any
-            if (model.SelectedUserIds != null && model.SelectedUserIds.Count > 0)
+
+            // Get users from associated template users
+            if (template.TemplateUsers != null && template.TemplateUsers.Count > 0)
             {
-                var additionalUsers = await _context.Users.Where(u => model.SelectedUserIds.Contains(u.Id.ToString())).ToListAsync();
-                recipients.AddRange(additionalUsers);
+                recipients.AddRange(template.TemplateUsers.Select(tu => tu.User));
             }
 
             recipients = recipients.Distinct().ToList();
@@ -132,6 +137,7 @@ namespace MailSender.Controllers
             TempData["SuccessMessage"] = $"Template emails sent successfully!";
             return RedirectToAction("Index", "Home");
         }
+
 
         private List<string> ExtractCidsFromHtml(string html)
         {
@@ -176,23 +182,99 @@ namespace MailSender.Controllers
             await _context.SaveChangesAsync();
         }
 
-        public async Task<IActionResult> UpdateTemplate(string templateName, string templateContent)
+        [HttpPost]
+        public async Task<IActionResult> UpdateTemplate(TemplateSendViewModel model)
         {
-            var template = await _context.Templates.FirstOrDefaultAsync(t => t.Name == templateName);
+            var template = await _context.Templates
+                .Include(t => t.TemplateGroups)
+                .Include(t => t.TemplateUsers)
+                .FirstOrDefaultAsync(t => t.Name == model.TemplateName);
+
             if (template == null)
             {
                 return NotFound();
             }
 
-            var baseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
-            templateContent = ReplaceUrlsWithCid(templateContent, baseUrl);
+            // Compare existing groups with selected groups
+            var existingGroupIds = template.TemplateGroups.Select(tg => tg.GroupId).ToList();
+            var selectedGroupIds = new List<int>();
 
-            template.Body = templateContent;
+            if (model.SelectedGroupNames != null && model.SelectedGroupNames.Count > 0)
+            {
+                foreach (var groupName in model.SelectedGroupNames)
+                {
+                    var group = await _context.Groups.FirstOrDefaultAsync(g => g.GroupName == groupName);
+                    if (group != null)
+                    {
+                        selectedGroupIds.Add(group.Id);
+                    }
+                }
+            }
+
+            var differentGroups = !existingGroupIds.SequenceEqual(selectedGroupIds);
+
+            // Compare existing users with selected users
+            var existingUserIds = template.TemplateUsers.Select(tu => tu.UserId).ToList();
+            var selectedUserIds = new List<int>();
+
+            if (model.SelectedUserIds != null && model.SelectedUserIds.Count > 0)
+            {
+                foreach (var userId in model.SelectedUserIds)
+                {
+                    if (int.TryParse(userId, out int uid))
+                    {
+                        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == uid);
+                        if (user != null)
+                        {
+                            selectedUserIds.Add(user.Id);
+                        }
+                    }
+                }
+            }
+
+            var differentUsers = !existingUserIds.SequenceEqual(selectedUserIds);
+
+            // Clear existing associations if they are different
+            if (differentGroups)
+            {
+                _context.TemplateGroups.RemoveRange(template.TemplateGroups);
+
+                foreach (var groupId in selectedGroupIds)
+                {
+                    _context.TemplateGroups.Add(new TemplateGroup
+                    {
+                        TemplateId = template.Id,
+                        GroupId = groupId
+                    });
+                }
+            }
+
+            if (differentUsers)
+            {
+                _context.TemplateUsers.RemoveRange(template.TemplateUsers);
+
+                foreach (var userId in selectedUserIds)
+                {
+                    _context.TemplateUsers.Add(new TemplateUser
+                    {
+                        TemplateId = template.Id,
+                        UserId = userId
+                    });
+                }
+            }
+
+            // Convert image sources to CID
+            var baseUrl = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}{HttpContext.Request.PathBase}";
+            var updatedTemplateContent = ReplaceUrlsWithCid(model.TemplateContent, baseUrl);
+
+            // Update template body
+            template.Body = updatedTemplateContent;
             _context.Templates.Update(template);
             await _context.SaveChangesAsync();
 
             return Ok();
         }
+
 
         private string ReplaceUrlsWithCid(string content, string baseUrl)
         {
@@ -209,6 +291,7 @@ namespace MailSender.Controllers
                 return match.Value;
             });
         }
+
 
 
         [HttpGet]
@@ -252,5 +335,39 @@ namespace MailSender.Controllers
 
             return Ok(new { location = fileUrl });
         }
+
+        [HttpGet]
+        public async Task<IActionResult> GetTemplateContentWithVariables(string templateName)
+        {
+            try
+            {
+                var template = await _context.Templates
+                                             .Include(t => t.TemplateVariables)
+                                             .ThenInclude(tv => tv.Variable)
+                                             .FirstOrDefaultAsync(t => t.Name == templateName);
+
+                if (template == null)
+                {
+                    return NotFound(new { message = $"Template with name {templateName} not found." });
+                }
+
+                var baseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
+                var templateContent = ReplaceCidWithUrls(template.Body, baseUrl);
+
+                // Fetch variable names
+                var variableNames = template.TemplateVariables.Select(tv => tv.Variable.Var_name).ToList();
+
+                var varDesc = template.TemplateVariables.Select(tv => tv.Variable.Description).ToList();
+
+                return Json(new { content = templateContent, variableNames = variableNames, variableDescriptions = varDesc });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while fetching the template content.");
+                return StatusCode(500, new { message = "An internal server error occurred." });
+            }
+        }
+
+
     }
 }

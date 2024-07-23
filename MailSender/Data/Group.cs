@@ -14,5 +14,7 @@ namespace MailSender.Data
         public string GroupName { get; set; }
 
         public ICollection<GroupMember> GroupMembers { get; set; }
+        public ICollection<TemplateGroup> TemplateGroups { get; set; }
+
     }
 }

@@ -14,6 +14,7 @@ namespace MailSender.Data
         public string LastName { get; set; }
         public virtual ICollection<GroupMember> GroupMemberships { get; set; }
 
+        public ICollection<TemplateUser> TemplateUsers { get; set; }
 
     }
 }

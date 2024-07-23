@@ -12,23 +12,91 @@
     <div class="row">
         <div class="col-sm-12 d-flex justify-content-center align-items-center">
             <div class="btn-group mt-3" role="group">
-                <a class="btn btn-primary btn-lg mr-3" href="@Url.Action("SendMail", "Mail")">
-                    <i class="fas fa-envelope"></i> Send Mail
-                </a>
-                <a class="btn btn-secondary btn-lg mr-3" href="@Url.Action("Templates", "Template")">
+                <a class="btn btn-primary btn-lg" href="@Url.Action("Templates", "Template")">
                     <i class="fas fa-file"></i> Templates
                 </a>
-                <a class="btn btn-secondary btn-lg" href="@Url.Action("TemplateSend", "Template")">
-                    <i class="fas fa-envelope-open"></i> Send Template Email
-                </a>
+            </div>
+        </div>
+    </div>
+    <div class="row mt-3">
+        <div class="col-sm-12 d-flex justify-content-center align-items-center">
+            <div class="btn-group" role="group">
+                <form id="formA" method="post" asp-action="SendTemplateEmail" asp-controller="Template">
+                    <input type="hidden" name="templateName" value="TemplateEmailGroupA.html">
+                    <button type="submit" class="btn btn-secondary btn-lg mr-3">TemplateEmailGroupA</button>
+                </form>
+                <form id="formB" method="post" asp-action="SendTemplateEmail" asp-controller="Template">
+                    <input type="hidden" name="templateName" value="TemplateEmailGroupB.html">
+                    <button type="submit" class="btn btn-secondary btn-lg">TemplateEmailGroupB</button>
+                </form>
             </div>
         </div>
     </div>
 </div>
 
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="~/js/signalr/dist/browser/signalr.js"></script>
+<script src="~/js/chat.js"></script>
 
 @section Scripts {
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
-    <script src="~/js/signalr/dist/browser/signalr.js"></script>
-    <script src="~/js/chat.js"></script>
+    <script>
+        $(document).ready(function () {
+            console.log('Document ready');
+
+            // Initialize SignalR connection
+            var connection = new signalR.HubConnectionBuilder().withUrl("/chatHub").build();
+
+            connection.on("ReceiveMessage", function (user, message) {
+                console.log('Received message:', user, message);
+                var li = document.createElement("li");
+                li.textContent = `${user}: ${message}`;
+                document.getElementById("messagesList").appendChild(li);
+
+                if (Notification.permission === "granted") {
+                    new Notification(user, {
+                        body: message
+                    });
+                } else if (Notification.permission !== "denied") {
+                    Notification.requestPermission().then(function (permission) {
+                        if (permission === "granted") {
+                            new Notification(user, {
+                                body: message
+                            });
+                        }
+                    });
+                }
+            });
+
+            connection.start().catch(function (err) {
+                return console.error('SignalR connection error:', err.toString());
+            });
+
+            function handleFormSubmit(event) {
+                event.preventDefault();
+
+                var form = $(this);
+                var url = form.attr('action');
+
+                $.ajax({
+                    type: "POST",
+                    url: url,
+                    data: form.serialize(),
+                    success: function (response) {
+                        var user = 'System';
+                        var message = 'An email template has been sent.';
+                        connection.invoke("SendMessage", user, message).catch(function (err) {
+                            return console.error('Error sending message:', err.toString());
+                        });
+                    },
+                    error: function (error) {
+                        alert("Error sending email.");
+                    }
+                });
+            }
+
+            $('#formA').submit(handleFormSubmit);
+            $('#formB').submit(handleFormSubmit);
+        });
+    </script>
 }

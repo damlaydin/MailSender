@@ -28,7 +28,7 @@ namespace MailSender.Services
                 new ToastContentBuilder()
                     .AddText(user)
                     .AddText(message)
-                    .Show(); // This should work in the appropriate context
+                    .Show(); 
             });
 
             while (!stoppingToken.IsCancellationRequested)
@@ -41,7 +41,7 @@ namespace MailSender.Services
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error connecting: {ex.Message}");
+                    Console.WriteLine($"Stopped connecting: {ex.Message}");
                     await Task.Delay(5000, stoppingToken); // Wait before retrying
                 }
             }

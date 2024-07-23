@@ -24,21 +24,47 @@ namespace MailSender.Data
         public DbSet<GroupMember> GroupMembers { get; set; }
         public DbSet<Template> Templates { get; set; }
         public DbSet<TemplateImage> TemplateImages { get; set; }
+        public DbSet<Variable> variables { get; set; }
+        public DbSet<TemplateVariable> templateVariables { get; set; }
+        public DbSet<TemplateGroup> TemplateGroups { get; set; }
+        public DbSet<TemplateUser> TemplateUsers { get; set; }
+
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+
+            base.OnModelCreating(modelBuilder);
+
+
             modelBuilder.Entity<SentEmail>()
                 .HasMany(e => e.Attachments)
                 .WithOne(a => a.SentEmail)
                 .HasForeignKey(a => a.SentEmailId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            modelBuilder.Entity<TemplateImage>()
-            .HasOne(ti => ti.Template)
-            .WithMany(t => t.TemplateImages)
-            .HasForeignKey(ti => ti.TemplateId);
+            modelBuilder.Entity<TemplateGroup>()
+                  .HasOne(tg => tg.Template)
+                  .WithMany(t => t.TemplateGroups)
+                  .HasForeignKey(tg => tg.TemplateId);
 
-            base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<TemplateGroup>()
+                .HasOne(tg => tg.Group)
+                .WithMany(g => g.TemplateGroups)
+                .HasForeignKey(tg => tg.GroupId);
+
+            modelBuilder.Entity<TemplateUser>()
+                .HasOne(tu => tu.Template)
+                .WithMany(t => t.TemplateUsers)
+                .HasForeignKey(tu => tu.TemplateId);
+
+            modelBuilder.Entity<TemplateUser>()
+                .HasOne(tu => tu.User)
+                .WithMany(u => u.TemplateUsers)
+                .HasForeignKey(tu => tu.UserId);
+
+       
+
         }
     }
 }
